@@ -52,23 +52,27 @@ namespace :resque do
   end
 
   desc "See current worker status"
-  task :status, :roles => lambda { workers_roles() }, :on_no_matching_servers => :continue do
-    run(status_command)
+  task :status do
+    on roles(lambda { workers_roles() }), :on_no_matching_servers => :continue do
+      run(status_command)
+    end
   end
 
   desc "Start Resque workers"
-  task :start, :roles => lambda { workers_roles() }, :on_no_matching_servers => :continue do
-    for_each_workers do |role, workers|
-      worker_id = 1
-      workers.each_pair do |queue, number_of_workers|
-        logger.info "Starting #{number_of_workers} worker(s) with QUEUE: #{queue}"
-        threads = []
-        number_of_workers.times do
-          pid = "./tmp/pids/resque_work_#{worker_id}.pid"
-          threads << Thread.new(pid) { |pid| run(start_command(queue, pid), :roles => role) }
-          worker_id += 1
+  task :start do
+    on roles(lambda { workers_roles() }), :on_no_matching_servers => :continue do
+      for_each_workers do |role, workers|
+        worker_id = 1
+        workers.each_pair do |queue, number_of_workers|
+          logger.info "Starting #{number_of_workers} worker(s) with QUEUE: #{queue}"
+          threads = []
+          number_of_workers.times do
+            pid = "./tmp/pids/resque_work_#{worker_id}.pid"
+            threads << Thread.new(pid) { |pid| run(start_command(queue, pid), :roles => role) }
+            worker_id += 1
+          end
+          threads.each(&:join)
         end
-        threads.each(&:join)
       end
     end
   end
@@ -80,27 +84,35 @@ namespace :resque do
   # USR2 - Don't start to process any new jobs (pause)
   # CONT - Start to process new jobs again after a USR2 (resume)
   desc "Quit running Resque workers"
-  task :stop, :roles => lambda { workers_roles() }, :on_no_matching_servers => :continue do
-    run(stop_command)
+  task :stop do
+    on roles(lambda { workers_roles() }), :on_no_matching_servers => :continue do
+      run(stop_command)
+    end
   end
 
   desc "Restart running Resque workers"
-  task :restart, :roles => lambda { workers_roles() }, :on_no_matching_servers => :continue do
-    stop
-    start
+  task :restart do
+    on roles(lambda { workers_roles() }), :on_no_matching_servers => :continue do
+      stop
+      start
+    end
   end
 
   namespace :scheduler do
     desc "Starts resque scheduler with default configs"
-    task :start, :roles => :resque_scheduler do
-      pid = "#{current_path}/tmp/pids/scheduler.pid"
-      run(start_scheduler(pid))
+    task :start do
+      on roles(:resque_scheduler) do
+        pid = "#{current_path}/tmp/pids/scheduler.pid"
+        run(start_scheduler(pid))
+      end
     end
 
     desc "Stops resque scheduler"
-    task :stop, :roles => :resque_scheduler do
-      pid = "#{current_path}/tmp/pids/scheduler.pid"
-      run(stop_scheduler(pid))
+    task :stop do
+      on roles(:resque_scheduler) do
+        pid = "#{current_path}/tmp/pids/scheduler.pid"
+        run(stop_scheduler(pid))
+      end
     end
 
     task :restart do
